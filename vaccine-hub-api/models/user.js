@@ -4,27 +4,56 @@ const { BCRYPT_WORK_FACTOR } = require("../config");
 const { UnauthorizedError, BadRequestError } = require("../utils/error");
 
 class User {
+    static async makePublicUser(user) {
+        return {
+            id: user.id,
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            location: user.location,
+            date: user.date,
+        };
+    }
+
     static async login(credentials) {
-        /* user should submit their email and password
-                                                                        if any of these fields are missing, throw an error
-                                                                        lookup the user in the db by email
-                                                                        if a user is found, compare the submitted password
-                                                                        with the password in the db
-                                                                        if there is a match, return the user
-                                                                        if any of this goes wrong, throw an error
-                                                                        */
+        /* user should submit their email and passwor
+                        if any of these fields are missing, throw an error
+                        lookup the user in the db by email
+                        if a user is found, compare the submitted password
+                        with the password in the db
+                        if there is a match, return the user
+                        if any of this goes wrong, throw an error
+                        */
+
+        const requiredFields = ["email", "password"];
+        requiredFields.forEach((field) => {
+            if (!credentials.hasOwnProperty(field)) {
+                throw new BadRequestError(`Missing ${field} in request body`);
+            }
+        });
+
+        const user = await User.fetchUserByEmail(credentials.email);
+
+        if (user) {
+            const isValid = await bcrypt.compare(credentials.password, user.password);
+            if (isValid) {
+                return User.makePublicUser(user);
+            }
+        }
+
+        throw new UnauthorizedError("Invalid email/password combo");
     }
 
     static async register(credentials) {
         /*user should submit their email, pw, rsvp status, and # of guests
-                                                                    if any of these fields are missing, throw an error
-                                                                    make sure no user already exists in the system with that email
-                                                                    if one does, throw an error
-                                                                    take the users password, and hash it
-                                                                    take the users email, and lowercase it
-                                                                    create a new user in the db with all their info
-                                                                    return the user
-                                                        */
+                        if any of these fields are missing, throw an error
+                        make sure no user already exists in the system with that email
+                        if one does, throw an error
+                        take the users password, and hash it
+                        take the users email, and lowercase it
+                        create a new user in the db with all their info
+                        return the user
+                        */
         const requiredFields = [
             "email",
             "password",
@@ -77,7 +106,7 @@ class User {
 
         const user = result.rows[0];
 
-        return user;
+        return User.makePublicUser(user);
     }
 
     static async fetchUserByEmail(email) {
